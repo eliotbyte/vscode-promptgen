@@ -1,0 +1,21 @@
+# node
+node_modules/
+npm-debug.log*
+
+# VS Code extension build artifacts
+out/
+dist/
+.vscode-test/
+
+# TypeScript
+*.tsbuildinfo
+
+# VS Code local settings
+.vscode/
+
+# Webview build (если используешь Webpack и output dir)
+webview-dist/
+
+# OS-specific
+.DS_Store
+Thumbs.db

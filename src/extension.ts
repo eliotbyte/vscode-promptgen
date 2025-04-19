@@ -50,14 +50,14 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
         webview.postMessage({ command: 'result', payload: combined });
       } else if (msg.command === 'copy') {
         await vscode.env.clipboard.writeText(msg.payload);
-        vscode.window.showInformationMessage('Скопировано в буфер обмена!');
+        vscode.window.showInformationMessage('Copied to clipboard!');
       }
     });
   }
 }
 
 /**
- * Сканирует все .gitignore, собирает файлы и отфильтровывает их.
+ * Scans all .gitignore files, aggregates patterns, and filters workspace files.
  */
 async function getWorkspaceFiles(root: string): Promise<string[]> {
   const gitignoreUris = await vscode.workspace.findFiles('**/.gitignore');
@@ -90,25 +90,11 @@ async function getWorkspaceFiles(root: string): Promise<string[]> {
 }
 
 /**
- * Преобразует плоский список путей в дерево:
- * [ "a/b.txt", "a/c/d.js", "e.js" ]
- *   =>
- * [
- *   { name: 'a', type: 'dir', children: [
- *       { name: 'b.txt', type: 'file' },
- *       { name: 'c', type: 'dir', children: [
- *           { name: 'd.js', type: 'file' }
- *         ]
- *       }
- *     ]
- *   },
- *   { name: 'e.js', type: 'file' }
- * ]
+ * Transforms a flat list of file paths into a nested tree structure.
  */
 function buildTree(paths: string[]): any[] {
   const root: any = {};
 
-  // First, build a nested structure where each entry also has __path
   for (const p of paths) {
     const parts = p.split('/');
     let node = root;
@@ -121,7 +107,7 @@ function buildTree(paths: string[]): any[] {
         node[name] = {
           __name: name,
           __type: isFile ? 'file' : 'dir',
-          __path: relPath,        // ← store the relative path here
+          __path: relPath,
           __children: {}
         };
       }
@@ -129,7 +115,6 @@ function buildTree(paths: string[]): any[] {
     }
   }
 
-  // Convert the map into a sorted array and expose fullPath
   function toArray(obj: any): any[] {
     return Object.values(obj)
       .map((entry: any) => {
@@ -137,7 +122,7 @@ function buildTree(paths: string[]): any[] {
         const node: any = {
           name: __name,
           type: __type,
-          fullPath: __path          // ← emit fullPath for use in the webview
+          fullPath: __path
         };
 
         if (__type === 'dir') {

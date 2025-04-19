@@ -28,13 +28,14 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
 
     const root = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
     const files = root ? await getWorkspaceFiles(root) : [];
+    const tree = buildTree(files);
 
     const htmlPath = path.join(this.context.extensionPath, 'media', 'webview.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
     const nonce = getNonce();
     html = html
       .replace(/%NONCE%/g, nonce)
-      .replace(/%FILELIST%/g, JSON.stringify(files));
+      .replace(/%FILETREE%/g, JSON.stringify(tree));
     webview.html = html;
 
     webview.onDidReceiveMessage(async msg => {
@@ -56,13 +57,12 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
 }
 
 /**
- * Рекурсивно собирает все файлы в workspace, учитывая все .gitignore
+ * Сканирует все .gitignore, собирает файлы и отфильтровывает их.
  */
 async function getWorkspaceFiles(root: string): Promise<string[]> {
-  // Находим все .gitignore в проекте
   const gitignoreUris = await vscode.workspace.findFiles('**/.gitignore');
-  // Карта: относительный путь директории => объект ignore
   const gitMap: Record<string, ignore.Ignore> = {};
+
   for (const uri of gitignoreUris) {
     const dirFs = path.dirname(uri.fsPath);
     const relDir = path.relative(root, dirFs).split(path.sep).join('/') || '.';
@@ -70,28 +70,76 @@ async function getWorkspaceFiles(root: string): Promise<string[]> {
     gitMap[relDir] = ignore().add(content);
   }
 
-  // Ищем все файлы, исключая node_modules и .git
   const uris = await vscode.workspace.findFiles('**/*', '**/{node_modules,.git}/**');
-
   const relPaths = uris.map(u => path.relative(root, u.fsPath).split(path.sep).join('/'));
 
   return relPaths.filter(rel => {
-    // Проверяем каждый .gitignore в цепочке родительских директорий
     const segments = rel.split('/');
-    // Начнём с самого вложенного каталога и будем подниматься вверх
     for (let i = segments.length; i >= 0; i--) {
       const dir = i > 0 ? segments.slice(0, i).join('/') : '.';
       const ig = gitMap[dir];
       if (ig) {
-        // Относительный путь к файлу от .gitignore директории
-        const subPath = i > 0 ? segments.slice(i).join('/') : rel;
-        if (subPath && ig.ignores(subPath)) {
-          return false; // файл игнорируется
+        const sub = i > 0 ? segments.slice(i).join('/') : rel;
+        if (sub && ig.ignores(sub)) {
+          return false;
         }
       }
     }
     return true;
   });
+}
+
+/**
+ * Преобразует плоский список путей в дерево:
+ * [ "a/b.txt", "a/c/d.js", "e.js" ]
+ *   =>
+ * [
+ *   { name: 'a', type: 'dir', children: [
+ *       { name: 'b.txt', type: 'file' },
+ *       { name: 'c', type: 'dir', children: [
+ *           { name: 'd.js', type: 'file' }
+ *         ]
+ *       }
+ *     ]
+ *   },
+ *   { name: 'e.js', type: 'file' }
+ * ]
+ */
+function buildTree(paths: string[]): any[] {
+  const root: any = {};
+
+  for (const p of paths) {
+    const parts = p.split('/');
+    let node = root;
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      if (!node[name]) {
+        node[name] = { __name: name, __type: (i === parts.length - 1 ? 'file' : 'dir'), __children: {} };
+      }
+      node = node[name].__children;
+    }
+  }
+
+  function toArray(obj: any): any[] {
+    return Object.values(obj)
+      .map((entry: any) => {
+        const { __name, __type, __children } = entry;
+        const node: any = { name: __name, type: __type };
+        if (__type === 'dir') {
+          node.children = toArray(__children).sort((a: any, b: any) => {
+            if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          });
+        }
+        return node;
+      })
+      .sort((a: any, b: any) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  return toArray(root);
 }
 
 function getNonce(): string {

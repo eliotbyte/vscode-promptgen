@@ -112,15 +112,10 @@
     document.getElementById('generate').addEventListener('click', () => {
       const checkedEls = document.querySelectorAll('#files input[type=checkbox]:checked');
       const files = Array.from(checkedEls).map(el => el.value);
+      const addStructure = document.getElementById('addStructure').checked;
       const rules = document.getElementById('rules-text').value;
-      const task  = document.getElementById('task-text').value;
-      const addStruct = document.getElementById('addStructure').checked;
-      const customText = 
-        `Options:\n` +
-        `- Add project structure: ${addStruct}\n\n` +
-        `Rules:\n${rules}\n\n` +
-        `Task:\n${task}\n\n`;
-      vscode.postMessage({ command: 'generate', files, customText });
+      const task = document.getElementById('task-text').value;
+      vscode.postMessage({ command: 'generate', files, addStructure, rules, task });
     });
 
     // Copy result

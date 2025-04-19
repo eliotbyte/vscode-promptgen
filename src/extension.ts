@@ -27,8 +27,8 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
     };
 
     const root = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-    const files = root ? await getWorkspaceFiles(root) : [];
-    const tree = buildTree(files);
+    const filesList = root ? await getWorkspaceFiles(root) : [];
+    const tree = buildTree(filesList);
 
     const htmlPath = path.join(this.context.extensionPath, 'media', 'webview.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
@@ -40,20 +40,67 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
 
     webview.onDidReceiveMessage(async msg => {
       if (msg.command === 'generate') {
-        let combined = msg.customText + '\n\n';
-        for (const f of msg.files) {
-          const fileUri = vscode.Uri.file(path.join(root!, f));
-          const bytes = await vscode.workspace.fs.readFile(fileUri);
-          const text = Buffer.from(bytes).toString('utf8');
-          combined += `--- ${f} ---\n${text}\n\n`;
+        const { files, addStructure, rules, task } = msg;
+        let result = '';
+
+        // 1. Project structure as YAML manifest
+        if (addStructure) {
+          const allFiles = flattenPaths(tree);
+          result += '<filetree>\n';
+          result += '```yaml\n';
+          result += 'files:\n';
+          allFiles.forEach(f => {
+            result += `  - ${f}\n`;
+          });
+          result += '```\n';
+          result += '</filetree>\n\n';
         }
-        webview.postMessage({ command: 'result', payload: combined });
+
+        // 2. Code of selected files
+        if (files.length) {
+          result += '<code>\n';
+          for (const f of files) {
+            const fileUri = vscode.Uri.file(path.join(root!, f));
+            const bytes = await vscode.workspace.fs.readFile(fileUri);
+            const text = Buffer.from(bytes).toString('utf8');
+            const ext = path.extname(f).slice(1);
+            result += `\`\`\`${ext} ${f}\n${text}\n\`\`\`\n\n`;
+          }
+          result += '</code>\n\n';
+        }
+
+        // 3. Rules section
+        if (rules && rules.trim()) {
+          result += `<rules>\n${rules}\n</rules>\n\n`;
+        }
+
+        // 4. Task section
+        if (task && task.trim()) {
+          result += `<task>\n${task}\n</task>\n\n`;
+        }
+
+        webview.postMessage({ command: 'result', payload: result });
       } else if (msg.command === 'copy') {
         await vscode.env.clipboard.writeText(msg.payload);
         vscode.window.showInformationMessage('Copied to clipboard!');
       }
     });
   }
+}
+
+/**
+ * Flattens the nested tree into a list of file paths.
+ */
+function flattenPaths(nodes: any[]): string[] {
+  let result: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      result.push(node.fullPath);
+    } else if (node.type === 'dir' && node.children) {
+      result.push(...flattenPaths(node.children));
+    }
+  }
+  return result;
 }
 
 /**

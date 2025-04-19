@@ -2,7 +2,7 @@
   "name": "promptgen",
   "displayName": "PromptGen",
   "description": "Generate prompts from selected files and custom input fields",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.99.0"
   },

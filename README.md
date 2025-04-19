@@ -1,71 +1,73 @@
-# promptgen README
+## promptgen
 
-This is the README for your extension "promptgen". After writing up a brief description, we recommend including the following sections.
+`promptgen` — VS Code extension for generating and copying code snippets and YAML manifests directly from your workspace.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Interactive file tree**: Browse and select files in your workspace via a collapsible directory tree.
+- **Customizable options**: Toggle project structure export, define rules, and describe tasks directly in the sidebar.
+- **Persistent state**: All selections and inputs are remembered across sessions via VS Code `workspaceState`.
+- **Live updates**: Automatically refreshes file list on workspace changes using `FileSystemWatcher`.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- [Node.js](https://nodejs.org/) (>=12.x)
+- [Visual Studio Code](https://code.visualstudio.com/) (>=1.50)
+- [`vsce`](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) CLI to package the extension (install via `npm install -g vsce`) ([code.visualstudio.com](https://code.visualstudio.com/api/working-with-extensions/publishing-extension?utm_source=chatgpt.com))
+
+## Installation
+
+### 1. Build and package
+
+1. Clone or download this repository.
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Package the extension as a `.vsix`:
+
+```bash
+vsce package
+```
+
+This will create a file like `promptgen-1.0.0.vsix` in the project root ([code.visualstudio.com](https://code.visualstudio.com/api/working-with-extensions/publishing-extension?utm_source=chatgpt.com)).
+
+### 2. Install in VS Code
+
+#### Via the Extensions view
+
+1. Open the **Extensions** sidebar (⇧⌘X on macOS, Ctrl+Shift+X on Windows/Linux).
+2. Click the **...** menu at the top and select **Install from VSIX...**.
+3. Choose the generated `promptgen-*.vsix` file and click **Install** ([code.visualstudio.com](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace?utm_source=chatgpt.com)).
+
+#### Via the command line
+
+You can also install the packaged extension using the VS Code CLI:
+
+```bash
+code --install-extension promptgen-1.0.0.vsix
+```
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+This extension does not contribute any new VS Code settings.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- If you move or rename files externally, the extension refreshes automatically; however, unsaved selections pointing to removed files will be cleared.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
 
-Initial release of ...
+- Initial release with full file-tree browsing, state persistence, and live updates.
 
-### 1.0.1
+## Contributing
 
-Fixed issue #.
+Contributions are welcome! Please open issues or pull requests on the [GitHub repository].
 
-### 1.1.0
+## License
 
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+MIT © Eliot Byte

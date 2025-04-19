@@ -108,29 +108,46 @@ async function getWorkspaceFiles(root: string): Promise<string[]> {
 function buildTree(paths: string[]): any[] {
   const root: any = {};
 
+  // First, build a nested structure where each entry also has __path
   for (const p of paths) {
     const parts = p.split('/');
     let node = root;
     for (let i = 0; i < parts.length; i++) {
       const name = parts[i];
+      const isFile = i === parts.length - 1;
+      const relPath = parts.slice(0, i + 1).join('/');
+
       if (!node[name]) {
-        node[name] = { __name: name, __type: (i === parts.length - 1 ? 'file' : 'dir'), __children: {} };
+        node[name] = {
+          __name: name,
+          __type: isFile ? 'file' : 'dir',
+          __path: relPath,        // ← store the relative path here
+          __children: {}
+        };
       }
       node = node[name].__children;
     }
   }
 
+  // Convert the map into a sorted array and expose fullPath
   function toArray(obj: any): any[] {
     return Object.values(obj)
       .map((entry: any) => {
-        const { __name, __type, __children } = entry;
-        const node: any = { name: __name, type: __type };
+        const { __name, __type, __path, __children } = entry;
+        const node: any = {
+          name: __name,
+          type: __type,
+          fullPath: __path          // ← emit fullPath for use in the webview
+        };
+
         if (__type === 'dir') {
-          node.children = toArray(__children).sort((a: any, b: any) => {
-            if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
-            return a.name.localeCompare(b.name);
-          });
+          node.children = toArray(__children)
+            .sort((a: any, b: any) => {
+              if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+              return a.name.localeCompare(b.name);
+            });
         }
+
         return node;
       })
       .sort((a: any, b: any) => {

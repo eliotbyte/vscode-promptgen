@@ -7,7 +7,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       'promptgen.sidebar',
-      new PromptGeneratorView(context)
+      new PromptGeneratorView(context),
+      {
+        webviewOptions: {
+          retainContextWhenHidden: true
+        }
+      }
     )
   );
 }

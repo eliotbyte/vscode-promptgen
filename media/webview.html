@@ -1,80 +1,125 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta
-    http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'nonce-%NONCE%'; style-src 'unsafe-inline';"
-  >
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-  <h2>Выберите файлы</h2>
-  <div id="file-tree"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'nonce-%NONCE%'; style-src 'unsafe-inline';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <h2>Выберите файлы</h2>
+    <div id="file-tree"></div>
 
-  <h2>Текстовое поле</h2>
-  <textarea id="custom-text" rows="6" cols="60"
-    placeholder="Вставьте инструкции или комментарии..."></textarea>
-  <br><br>
-  <button id="generate">Сгенерировать и скопировать</button>
+    <h2>Текстовое поле</h2>
+    <textarea
+      id="custom-text"
+      placeholder="Вставьте инструкции или комментарии..."
+    ></textarea>
+    <br /><br />
+    <button id="generate">Сгенерировать и скопировать</button>
 
-  <script nonce="%NONCE%">
-    const vscode = acquireVsCodeApi();
-    const tree = %FILETREE%;
+    <script nonce="%NONCE%">
+      const vscode = acquireVsCodeApi();
+      const tree = %FILETREE%;
 
-    function renderTree(nodes, container) {
-      const ul = document.createElement('ul');
-      for (const node of nodes) {
-        const li = document.createElement('li');
-        if (node.type === 'dir') {
-          const span = document.createElement('span');
-          span.textContent = '📁 ' + node.name;
-          span.style.cursor = 'pointer';
-          span.onclick = () => {
-            ulNested.classList.toggle('hidden');
-          };
-          li.append(span);
-          const ulNested = document.createElement('ul');
-          ulNested.style.paddingLeft = '16px';
-          node.children.forEach(child => {
-            renderTree([child], ulNested);
-          });
-          li.append(ulNested);
-        } else {
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.value = node.name; // здесь лучше передавать полный путь, если нужно
-          cb.style.marginRight = '4px';
-          li.append(cb, document.createTextNode(node.name));
+      function renderTree(nodes, container) {
+        const ul = document.createElement('ul');
+        for (const node of nodes) {
+          const li = document.createElement('li');
+          if (node.type === 'dir') {
+            const span = document.createElement('span');
+            span.textContent = '📁 ' + node.name;
+            span.style.cursor = 'pointer';
+            span.onclick = () => nestedUl.classList.toggle('hidden');
+            li.append(span);
+
+            const nestedUl = document.createElement('ul');
+            nestedUl.style.paddingLeft = '16px';
+            nestedUl.classList.add('hidden');
+            node.children.forEach(child => renderTree([child], nestedUl));
+            li.append(nestedUl);
+          } else {
+            const label = document.createElement('label');
+            label.className = 'file-label';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = node.fullPath || node.name; // полный путь, если доступен
+            label.append(cb, document.createTextNode(node.name));
+            li.append(label);
+          }
+          ul.append(li);
         }
-        ul.append(li);
+        container.append(ul);
       }
-      container.append(ul);
-    }
 
-    const container = document.getElementById('file-tree');
-    renderTree(tree, container);
+      const container = document.getElementById('file-tree');
+      renderTree(tree, container);
 
-    document.getElementById('generate').addEventListener('click', () => {
-      const checkedEls = document.querySelectorAll('input[type=checkbox]:checked');
-      const files = Array.from(checkedEls).map(el => {
-        // Для реальной работы вам может понадобиться хранить полные пути в data-атрибутах
-        return el.value;
+      // Авторасширение textarea по содержимому
+      const textarea = document.getElementById('custom-text');
+      textarea.style.width = '100%';
+      textarea.style.boxSizing = 'border-box';
+      textarea.style.overflow = 'hidden';
+      function autoResize() {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      }
+      textarea.addEventListener('input', autoResize);
+      autoResize();
+
+      document.getElementById('generate').addEventListener('click', () => {
+        const checkedEls = document.querySelectorAll('input[type=checkbox]:checked');
+        const files = Array.from(checkedEls).map(el => el.value);
+        const customText = textarea.value;
+        vscode.postMessage({ command: 'generate', files, customText });
       });
-      const customText = document.getElementById('custom-text').value;
-      vscode.postMessage({ command: 'generate', files, customText });
-    });
 
-    window.addEventListener('message', event => {
-      if (event.data.command === 'result') {
-        vscode.postMessage({ command: 'copy', payload: event.data.payload });
+      window.addEventListener('message', event => {
+        if (event.data.command === 'result') {
+          vscode.postMessage({ command: 'copy', payload: event.data.payload });
+        }
+      });
+    </script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        color: var(--vscode-editor-foreground);
+        background-color: var(--vscode-editor-background);
+        font-family: var(--vscode-editor-font-family);
       }
-    });
-  </script>
 
-  <style>
-    ul { list-style-type: none; padding-left: 0; }
-    .hidden { display: none; }
-  </style>
-</body>
+      /* Скрываем уголок ресайза */
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        border: 1px solid var(--vscode-input-border);
+        resize: none; /* Отключаем уголок */
+        overflow: hidden; /* Чистое авторазмеривание */
+      }
+
+      /* Подсветка при наведении на файл */
+      .file-label:hover {
+        background: var(--vscode-list-hoverBackground);
+      }
+
+      /* Кнопка как VS Code */
+      button {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-button-border);
+        padding: 4px 12px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+    </style>
+  </body>
 </html>

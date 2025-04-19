@@ -1,0 +1,50 @@
+{
+  "name": "promptgen",
+  "displayName": "PromptGen",
+  "description": "Generate prompts from selected files and custom input fields",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "promptgen",
+          "title": "PromptGen",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "promptgen": [
+        {
+          "id": "promptgen.sidebar",
+          "name": "Prompt Generator",
+          "icon": "media/icon.svg",
+          "type": "webview"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "pretest": "npm run compile",
+    "test": "echo \"No tests yet\""
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.99.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "ignore": "^7.0.3"
+  }
+}

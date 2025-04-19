@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'nonce-%NONCE%'; style-src 'unsafe-inline';"
+  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt Generator</title>
+</head>
+<body>
+  <h2>Выберите файлы</h2>
+  <ul id="file-list"></ul>
+
+  <h2>Текстовое поле</h2>
+  <textarea
+    id="custom-text"
+    rows="6"
+    cols="60"
+    placeholder="Вставьте инструкции или комментарии..."
+  ></textarea>
+  <br><br>
+  <button id="generate">Сгенерировать и скопировать</button>
+
+  <script nonce="%NONCE%">
+    const vscode = acquireVsCodeApi();
+    // Сразу массив строк (относительные пути)
+    const files = %FILELIST%;
+    const ul = document.getElementById('file-list');
+    files.forEach(f => {
+      const li = document.createElement('li');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = f;
+      li.append(cb, document.createTextNode(' ' + f));
+      ul.append(li);
+    });
+
+    document.getElementById('generate').addEventListener('click', () => {
+      const checked = Array.from(
+        document.querySelectorAll('input[type=checkbox]:checked')
+      ).map(el => el.value);
+      const customText = document.getElementById('custom-text').value;
+      vscode.postMessage({
+        command: 'generate',
+        files: checked,
+        customText
+      });
+    });
+
+    window.addEventListener('message', event => {
+      if (event.data.command === 'result') {
+        vscode.postMessage({ command: 'copy', payload: event.data.payload });
+      }
+    });
+  </script>
+</body>
+</html>

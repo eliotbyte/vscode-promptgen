@@ -1,6 +1,8 @@
-# node
+# Node.js
 node_modules/
-npm-debug.log*
+dist/
+out/
+*.log
 
 # VS Code extension build artifacts
 out/
@@ -19,3 +21,10 @@ webview-dist/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# npm
+package-lock.json
+
+# Webpack/Parcel/etc.
+.cache/
+build/

@@ -46,5 +46,14 @@
   },
   "dependencies": {
     "ignore": "^7.0.3"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eliotbyte/vscode-promptgen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/eliotbyte/vscode-promptgen/issues"
+  },
+  "homepage": "https://github.com/eliotbyte/vscode-promptgen#readme"
 }

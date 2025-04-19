@@ -51,8 +51,9 @@
 
   <script nonce="%NONCE%">
     const vscode = acquireVsCodeApi();
-    const tree = %FILETREE%;
-    // Load persisted state (or defaults)
+    let tree = %FILETREE%;
+
+    // Load persisted state
     const state = vscode.getState() || {
       files: [],
       addStructure: false,
@@ -91,7 +92,6 @@
           const cb = document.createElement('input');
           cb.type = 'checkbox';
           cb.value = node.fullPath || node.name;
-          // restore checked state
           if (state.files.includes(cb.value)) {
             cb.checked = true;
           }
@@ -122,34 +122,40 @@
         persistState();
       });
     });
-    // restore text
     rulesTa.value = state.rules;
     taskTa.value = state.task;
     autoResize(rulesTa);
     autoResize(taskTa);
 
-    // restore checkbox
+    // restore and listen for options checkbox
     const addStructCb = document.getElementById('addStructure');
     addStructCb.checked = state.addStructure;
     addStructCb.addEventListener('change', persistState);
 
     // Generate
     document.getElementById('generate').addEventListener('click', () => {
-      const currentState = gatherState();
-      vscode.postMessage({ command: 'generate', ...currentState });
+      const current = gatherState();
+      vscode.postMessage({ command: 'generate', ...current });
     });
 
-    // Copy result
+    // Handle incoming messages
     window.addEventListener('message', event => {
-      if (event.data.command === 'result') {
-        vscode.postMessage({ command: 'copy', payload: event.data.payload });
+      const msg = event.data;
+      if (msg.command === 'result') {
+        vscode.postMessage({ command: 'copy', payload: msg.payload });
+      } else if (msg.command === 'updateTree') {
+        // replace tree and re-render
+        tree = msg.tree;
+        fileContainer.innerHTML = '';
+        renderTree(tree, fileContainer);
       }
     });
 
     // Gather UI state
     function gatherState() {
-      const checkedEls = document.querySelectorAll('#files input[type=checkbox]:checked');
-      const files = Array.from(checkedEls).map(el => el.value);
+      const files = Array.from(
+        document.querySelectorAll('#files input[type=checkbox]:checked')
+      ).map(el => el.value);
       return {
         files,
         addStructure: addStructCb.checked,
@@ -158,11 +164,11 @@
       };
     }
 
-    // Persist state to extension
+    // Persist state in webview and notify extension
     function persistState() {
-      const newState = gatherState();
-      vscode.setState(newState);
-      vscode.postMessage({ command: 'state', state: newState });
+      const s = gatherState();
+      vscode.setState(s);
+      vscode.postMessage({ command: 'state', state: s });
     }
   </script>
 

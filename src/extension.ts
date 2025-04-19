@@ -26,11 +26,9 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
       ]
     };
 
-    // Получаем корень первого workspace
     const root = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
     const files = root ? await getWorkspaceFiles(root) : [];
 
-    // Загружаем HTML-шаблон и подставляем nonce + массив файлов
     const htmlPath = path.join(this.context.extensionPath, 'media', 'webview.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
     const nonce = getNonce();
@@ -39,7 +37,6 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
       .replace(/%FILELIST%/g, JSON.stringify(files));
     webview.html = html;
 
-    // Приём и обработка сообщений из Webview
     webview.onDidReceiveMessage(async msg => {
       if (msg.command === 'generate') {
         let combined = msg.customText + '\n\n';
@@ -58,24 +55,43 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
   }
 }
 
+/**
+ * Рекурсивно собирает все файлы в workspace, учитывая все .gitignore
+ */
 async function getWorkspaceFiles(root: string): Promise<string[]> {
-  // Считываем .gitignore (если есть)
-  const gitignorePath = path.join(root, '.gitignore');
-  let ig = ignore();
-  if (fs.existsSync(gitignorePath)) {
-    const content = fs.readFileSync(gitignorePath, 'utf8');
-    ig = ignore().add(content);
+  // Находим все .gitignore в проекте
+  const gitignoreUris = await vscode.workspace.findFiles('**/.gitignore');
+  // Карта: относительный путь директории => объект ignore
+  const gitMap: Record<string, ignore.Ignore> = {};
+  for (const uri of gitignoreUris) {
+    const dirFs = path.dirname(uri.fsPath);
+    const relDir = path.relative(root, dirFs).split(path.sep).join('/') || '.';
+    const content = fs.readFileSync(uri.fsPath, 'utf8');
+    gitMap[relDir] = ignore().add(content);
   }
 
   // Ищем все файлы, исключая node_modules и .git
   const uris = await vscode.workspace.findFiles('**/*', '**/{node_modules,.git}/**');
 
-  return uris
-    .map(uri => {
-      // Относительный путь и нормализация в UNIX‑стиль
-      return path.relative(root, uri.fsPath).split(path.sep).join('/');
-    })
-    .filter(rel => !ig.ignores(rel));
+  const relPaths = uris.map(u => path.relative(root, u.fsPath).split(path.sep).join('/'));
+
+  return relPaths.filter(rel => {
+    // Проверяем каждый .gitignore в цепочке родительских директорий
+    const segments = rel.split('/');
+    // Начнём с самого вложенного каталога и будем подниматься вверх
+    for (let i = segments.length; i >= 0; i--) {
+      const dir = i > 0 ? segments.slice(0, i).join('/') : '.';
+      const ig = gitMap[dir];
+      if (ig) {
+        // Относительный путь к файлу от .gitignore директории
+        const subPath = i > 0 ? segments.slice(i).join('/') : rel;
+        if (subPath && ig.ignores(subPath)) {
+          return false; // файл игнорируется
+        }
+      }
+    }
+    return true;
+  });
 }
 
 function getNonce(): string {

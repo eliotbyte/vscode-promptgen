@@ -1,125 +1,234 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'nonce-%NONCE%'; style-src 'unsafe-inline';"
-    />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  </head>
-  <body>
-    <h2>Выберите файлы</h2>
-    <div id="file-tree"></div>
+<head>
+  <meta charset="UTF-8">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'nonce-%NONCE%'; style-src 'unsafe-inline';"
+  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptGen</title>
+</head>
+<body>
+  <!-- Таб-панель -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="files">Файлы</button>
+    <button class="tab-btn"    data-tab="rules">Правила</button>
+    <button class="tab-btn"    data-tab="task">Задача</button>
+  </div>
 
-    <h2>Текстовое поле</h2>
-    <textarea
-      id="custom-text"
-      placeholder="Вставьте инструкции или комментарии..."
-    ></textarea>
-    <br /><br />
+  <!-- Рабочая область с прокруткой -->
+  <div class="content">
+    <!-- Таб Файлы -->
+    <div class="tab-panel" id="files">
+      <div id="file-tree"></div>
+    </div>
+
+    <!-- Таб Правила -->
+    <div class="tab-panel hidden" id="rules">
+      <h3>Правила</h3>
+      <textarea id="rules-text" placeholder="Опишите свои правила..." ></textarea>
+    </div>
+
+    <!-- Таб Задача -->
+    <div class="tab-panel hidden" id="task">
+      <h3>Задача</h3>
+      <textarea id="task-text" placeholder="Опишите задачу..." ></textarea>
+    </div>
+  </div>
+
+  <!-- Фиксированная панель копирования -->
+  <div class="footer">
     <button id="generate">Сгенерировать и скопировать</button>
+  </div>
 
-    <script nonce="%NONCE%">
-      const vscode = acquireVsCodeApi();
-      const tree = %FILETREE%;
+  <script nonce="%NONCE%">
+    const vscode = acquireVsCodeApi();
+    const tree = %FILETREE%;
 
-      function renderTree(nodes, container) {
-        const ul = document.createElement('ul');
-        for (const node of nodes) {
-          const li = document.createElement('li');
-          if (node.type === 'dir') {
-            const span = document.createElement('span');
-            span.textContent = '📁 ' + node.name;
-            span.style.cursor = 'pointer';
-            span.onclick = () => nestedUl.classList.toggle('hidden');
-            li.append(span);
-
-            const nestedUl = document.createElement('ul');
-            nestedUl.style.paddingLeft = '16px';
-            nestedUl.classList.add('hidden');
-            node.children.forEach(child => renderTree([child], nestedUl));
-            li.append(nestedUl);
-          } else {
-            const label = document.createElement('label');
-            label.className = 'file-label';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = node.fullPath || node.name; // полный путь, если доступен
-            label.append(cb, document.createTextNode(node.name));
-            li.append(label);
-          }
-          ul.append(li);
-        }
-        container.append(ul);
-      }
-
-      const container = document.getElementById('file-tree');
-      renderTree(tree, container);
-
-      // Авторасширение textarea по содержимому
-      const textarea = document.getElementById('custom-text');
-      textarea.style.width = '100%';
-      textarea.style.boxSizing = 'border-box';
-      textarea.style.overflow = 'hidden';
-      function autoResize() {
-        textarea.style.height = 'auto';
-        textarea.style.height = textarea.scrollHeight + 'px';
-      }
-      textarea.addEventListener('input', autoResize);
-      autoResize();
-
-      document.getElementById('generate').addEventListener('click', () => {
-        const checkedEls = document.querySelectorAll('input[type=checkbox]:checked');
-        const files = Array.from(checkedEls).map(el => el.value);
-        const customText = textarea.value;
-        vscode.postMessage({ command: 'generate', files, customText });
+    // --- Переход по табам ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // переключаем активную кнопку
+        document.querySelector('.tab-btn.active').classList.remove('active');
+        btn.classList.add('active');
+        // скрываем все панели, показываем нужную
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
       });
+    });
 
-      window.addEventListener('message', event => {
-        if (event.data.command === 'result') {
-          vscode.postMessage({ command: 'copy', payload: event.data.payload });
+    // --- Рендер файлового дерева ---
+    function renderTree(nodes, container) {
+      const ul = document.createElement('ul');
+      for (const node of nodes) {
+        const li = document.createElement('li');
+        if (node.type === 'dir') {
+          const span = document.createElement('span');
+          span.textContent = '📁 ' + node.name;
+          span.className = 'dir-name';
+          span.onclick = () => nestedUl.classList.toggle('hidden');
+          li.append(span);
+          const nestedUl = document.createElement('ul');
+          nestedUl.classList.add('nested', 'hidden');
+          renderTree(node.children, nestedUl);
+          li.append(nestedUl);
+        } else {
+          const label = document.createElement('label');
+          label.className = 'file-label';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = node.fullPath || node.name;
+          label.append(cb, document.createTextNode(node.name));
+          li.append(label);
         }
+        ul.append(li);
+      }
+      container.append(ul);
+    }
+    const fileContainer = document.getElementById('file-tree');
+    renderTree(tree, fileContainer);
+
+    // --- Авторасширение текстовых полей ---
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+    ['rules-text','task-text'].forEach(id => {
+      const ta = document.getElementById(id);
+      ta.style.width = '100%';
+      ta.style.boxSizing = 'border-box';
+      ta.style.overflow = 'hidden';
+      ta.addEventListener('input', () => autoResize(ta));
+      autoResize(ta);
+    });
+
+    // --- Обработка кнопки генерации ---
+    document.getElementById('generate').addEventListener('click', () => {
+      const checkedEls = document.querySelectorAll('#files input[type=checkbox]:checked');
+      const files = Array.from(checkedEls).map(el => el.value);
+      const rules = document.getElementById('rules-text').value;
+      const task  = document.getElementById('task-text').value;
+      vscode.postMessage({
+        command: 'generate',
+        files,
+        customText: `Правила:\n${rules}\n\nЗадача:\n${task}\n\n`
       });
-    </script>
+    });
 
-    <style>
-      body {
-        margin: 0;
-        padding: 16px;
-        color: var(--vscode-editor-foreground);
-        background-color: var(--vscode-editor-background);
-        font-family: var(--vscode-editor-font-family);
+    // --- Копирование результата ---
+    window.addEventListener('message', event => {
+      if (event.data.command === 'result') {
+        vscode.postMessage({ command: 'copy', payload: event.data.payload });
       }
+    });
+  </script>
 
-      /* Скрываем уголок ресайза */
-      textarea {
-        width: 100%;
-        box-sizing: border-box;
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border);
-        resize: none; /* Отключаем уголок */
-        overflow: hidden; /* Чистое авторазмеривание */
-      }
+  <style>
+    :root {
+      --bg: var(--vscode-editor-background);
+      --fg: var(--vscode-editor-foreground);
+      --input-bg: var(--vscode-input-background);
+      --input-fg: var(--vscode-input-foreground);
+      --border: var(--vscode-input-border);
+      --hover: var(--vscode-list-hoverBackground);
+      --btn-bg: var(--vscode-button-background);
+      --btn-fg: var(--vscode-button-foreground);
+      --btn-hover: var(--vscode-button-hoverBackground);
+    }
 
-      /* Подсветка при наведении на файл */
-      .file-label:hover {
-        background: var(--vscode-list-hoverBackground);
-      }
+    body {
+      margin: 0;
+      padding: 0;
+      color: var(--fg);
+      background: var(--bg);
+      font-family: var(--vscode-editor-font-family);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
 
-      /* Кнопка как VS Code */
-      button {
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-        border: 1px solid var(--vscode-button-border);
-        padding: 4px 12px;
-        border-radius: 3px;
-        cursor: pointer;
-      }
-      button:hover {
-        background: var(--vscode-button-hoverBackground);
-      }
-    </style>
-  </body>
+    /* Таб-панель */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--bg);
+      color: var(--fg);
+      border: none;
+      border-right: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .tab-btn:last-child { border-right: none; }
+    .tab-btn.active {
+      background: var(--input-bg);
+      font-weight: bold;
+    }
+
+    /* Рабочая область */
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 8px;
+    }
+    .tab-panel.hidden { display: none; }
+
+    /* Файловое дерево */
+    ul { list-style: none; margin: 0; padding-left: 16px; }
+    .nested { padding-left: 16px; }
+    .dir-name {
+      cursor: pointer;
+      display: block;
+      padding: 2px 4px;
+      user-select: none;
+    }
+    .dir-name:hover { background: var(--hover); }
+    .file-label {
+      display: flex;
+      align-items: center;
+      padding: 2px 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .file-label:hover { background: var(--hover); }
+    .file-label input { margin-right: 8px; }
+
+    /* Текстовые поля */
+    textarea {
+      background: var(--input-bg);
+      color: var(--input-fg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 4px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: var(--vscode-editor-font-size);
+      resize: none;
+      margin-top: 4px;
+    }
+
+    /* Фиксированная кнопка */
+    .footer {
+      padding: 8px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .footer button {
+      width: 100%;
+      padding: 8px;
+      background: var(--btn-bg);
+      color: var(--btn-fg);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .footer button:hover {
+      background: var(--btn-hover);
+    }
+  </style>
+</body>
 </html>

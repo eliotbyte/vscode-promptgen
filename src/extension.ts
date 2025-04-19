@@ -35,6 +35,19 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
     const filesList = root ? await getWorkspaceFiles(root) : [];
     const tree = buildTree(filesList);
 
+    // Retrieve persisted state
+    const persisted = this.context.workspaceState.get<{
+      files: string[];
+      addStructure: boolean;
+      rules: string;
+      task: string;
+    }>('promptgenState') || {
+      files: [],
+      addStructure: false,
+      rules: '',
+      task: ''
+    };
+
     const htmlPath = path.join(this.context.extensionPath, 'media', 'webview.html');
     let html = fs.readFileSync(htmlPath, 'utf8');
     const nonce = getNonce();
@@ -44,7 +57,10 @@ class PromptGeneratorView implements vscode.WebviewViewProvider {
     webview.html = html;
 
     webview.onDidReceiveMessage(async msg => {
-      if (msg.command === 'generate') {
+      if (msg.command === 'state') {
+        // Save updated UI state
+        await this.context.workspaceState.update('promptgenState', msg.state);
+      } else if (msg.command === 'generate') {
         const { files, addStructure, rules, task } = msg;
         let result = '';
 
@@ -113,7 +129,7 @@ function flattenPaths(nodes: any[]): string[] {
  */
 async function getWorkspaceFiles(root: string): Promise<string[]> {
   const gitignoreUris = await vscode.workspace.findFiles('**/.gitignore');
-  const gitMap: Record<string, ignore.Ignore> = {};
+  const gitMap: Record<string, any> = {};
 
   for (const uri of gitignoreUris) {
     const dirFs = path.dirname(uri.fsPath);

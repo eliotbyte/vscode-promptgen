@@ -52,6 +52,13 @@
   <script nonce="%NONCE%">
     const vscode = acquireVsCodeApi();
     const tree = %FILETREE%;
+    // Load persisted state (or defaults)
+    const state = vscode.getState() || {
+      files: [],
+      addStructure: false,
+      rules: '',
+      task: ''
+    };
 
     // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -84,6 +91,11 @@
           const cb = document.createElement('input');
           cb.type = 'checkbox';
           cb.value = node.fullPath || node.name;
+          // restore checked state
+          if (state.files.includes(cb.value)) {
+            cb.checked = true;
+          }
+          cb.addEventListener('change', persistState);
           label.append(cb, document.createTextNode(node.name));
           li.append(label);
         }
@@ -99,23 +111,32 @@
       el.style.height = 'auto';
       el.style.height = el.scrollHeight + 'px';
     }
-    ['rules-text','task-text'].forEach(id => {
-      const ta = document.getElementById(id);
+    const rulesTa = document.getElementById('rules-text');
+    const taskTa  = document.getElementById('task-text');
+    [rulesTa, taskTa].forEach(ta => {
       ta.style.width = '100%';
       ta.style.boxSizing = 'border-box';
       ta.style.overflow = 'hidden';
-      ta.addEventListener('input', () => autoResize(ta));
-      autoResize(ta);
+      ta.addEventListener('input', () => {
+        autoResize(ta);
+        persistState();
+      });
     });
+    // restore text
+    rulesTa.value = state.rules;
+    taskTa.value = state.task;
+    autoResize(rulesTa);
+    autoResize(taskTa);
+
+    // restore checkbox
+    const addStructCb = document.getElementById('addStructure');
+    addStructCb.checked = state.addStructure;
+    addStructCb.addEventListener('change', persistState);
 
     // Generate
     document.getElementById('generate').addEventListener('click', () => {
-      const checkedEls = document.querySelectorAll('#files input[type=checkbox]:checked');
-      const files = Array.from(checkedEls).map(el => el.value);
-      const addStructure = document.getElementById('addStructure').checked;
-      const rules = document.getElementById('rules-text').value;
-      const task = document.getElementById('task-text').value;
-      vscode.postMessage({ command: 'generate', files, addStructure, rules, task });
+      const currentState = gatherState();
+      vscode.postMessage({ command: 'generate', ...currentState });
     });
 
     // Copy result
@@ -124,6 +145,25 @@
         vscode.postMessage({ command: 'copy', payload: event.data.payload });
       }
     });
+
+    // Gather UI state
+    function gatherState() {
+      const checkedEls = document.querySelectorAll('#files input[type=checkbox]:checked');
+      const files = Array.from(checkedEls).map(el => el.value);
+      return {
+        files,
+        addStructure: addStructCb.checked,
+        rules: rulesTa.value,
+        task: taskTa.value
+      };
+    }
+
+    // Persist state to extension
+    function persistState() {
+      const newState = gatherState();
+      vscode.setState(newState);
+      vscode.postMessage({ command: 'state', state: newState });
+    }
   </script>
 
   <style>
